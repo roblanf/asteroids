@@ -1,8 +1,12 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-canvas.width = 800;
-canvas.height = 600;
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
 
 // --- Input ---
 const keys = {};
@@ -72,7 +76,7 @@ function spawnUfo() {
 
     const size = Math.random() < 0.3 ? 12 : 20; // small or large UFO
 
-    ufos.push({ x, y, vx, vy, radius: size, shootTimer: 60 + Math.floor(Math.random() * 60) });
+    ufos.push({ x, y, vx, vy, radius: size, shootTimer: 60 + Math.floor(Math.random() * 60), bobTimer: Math.random() * Math.PI * 2 });
 }
 
 function spawnParticles(x, y, count, color) {
@@ -175,6 +179,7 @@ function update() {
         const u = ufos[i];
         u.x += u.vx;
         u.y += u.vy;
+        u.bobTimer += 0.06;
 
         // UFO shooting
         u.shootTimer--;
@@ -341,25 +346,91 @@ function drawUfo(u) {
     ctx.save();
     ctx.translate(u.x, u.y);
     const s = u.radius;
+    const bob = Math.sin(u.bobTimer) * 2;
 
+    // Tractor beam glow underneath
+    const beamAlpha = 0.06 + Math.sin(u.bobTimer * 2) * 0.03;
+    const beamGrad = ctx.createRadialGradient(0, s * 0.5, 0, 0, s * 0.5, s * 1.5);
+    beamGrad.addColorStop(0, `rgba(0, 255, 100, ${beamAlpha})`);
+    beamGrad.addColorStop(1, "rgba(0, 255, 100, 0)");
+    ctx.fillStyle = beamGrad;
+    ctx.beginPath();
+    ctx.arc(0, s * 0.5, s * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ambient glow around saucer
+    const glowGrad = ctx.createRadialGradient(0, bob, s * 0.3, 0, bob, s * 1.3);
+    glowGrad.addColorStop(0, "rgba(0, 255, 150, 0.08)");
+    glowGrad.addColorStop(1, "rgba(0, 255, 150, 0)");
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(0, bob, s * 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bottom hull plate
+    ctx.fillStyle = "rgba(0, 80, 40, 0.6)";
+    ctx.beginPath();
+    ctx.ellipse(0, bob + s * 0.1, s * 0.7, s * 0.2, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = "#0a6";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Main saucer body
+    ctx.fillStyle = "rgba(0, 60, 30, 0.7)";
+    ctx.beginPath();
+    ctx.ellipse(0, bob, s, s * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.strokeStyle = "#0f0";
     ctx.lineWidth = 2;
+    ctx.stroke();
 
-    // Saucer body
+    // Upper rim highlight
+    ctx.strokeStyle = "rgba(100, 255, 180, 0.5)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.ellipse(0, 0, s, s * 0.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, bob - s * 0.05, s * 0.85, s * 0.28, 0, Math.PI + 0.3, -0.3);
     ctx.stroke();
 
     // Dome
+    const domeGrad = ctx.createLinearGradient(0, bob - s * 0.6, 0, bob - s * 0.1);
+    domeGrad.addColorStop(0, "rgba(100, 255, 200, 0.4)");
+    domeGrad.addColorStop(1, "rgba(0, 100, 50, 0.2)");
+    ctx.fillStyle = domeGrad;
     ctx.beginPath();
-    ctx.ellipse(0, -s * 0.2, s * 0.5, s * 0.35, 0, Math.PI, 0);
+    ctx.ellipse(0, bob - s * 0.2, s * 0.45, s * 0.38, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.strokeStyle = "#0f0";
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Bottom line
+    // Dome highlight
+    ctx.strokeStyle = "rgba(180, 255, 220, 0.6)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(-s * 0.6, s * 0.2);
-    ctx.lineTo(s * 0.6, s * 0.2);
+    ctx.ellipse(-s * 0.1, bob - s * 0.35, s * 0.15, s * 0.1, -0.3, Math.PI, 0);
     ctx.stroke();
+
+    // Rotating lights around the rim
+    const numLights = u.radius === 12 ? 5 : 8;
+    for (let i = 0; i < numLights; i++) {
+        const lightAngle = u.bobTimer * 1.5 + (i / numLights) * Math.PI * 2;
+        const lx = Math.cos(lightAngle) * s * 0.8;
+        const ly = Math.sin(lightAngle) * s * 0.25 + bob;
+        const brightness = 0.4 + Math.sin(lightAngle + u.bobTimer) * 0.4;
+
+        // Light glow
+        ctx.fillStyle = `rgba(0, 255, 120, ${brightness * 0.3})`;
+        ctx.beginPath();
+        ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Light core
+        ctx.fillStyle = `rgba(150, 255, 200, ${brightness})`;
+        ctx.beginPath();
+        ctx.arc(lx, ly, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
     ctx.restore();
 }
