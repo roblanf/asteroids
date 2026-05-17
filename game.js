@@ -30,6 +30,109 @@ const bullets = [];
 const ufos = [];
 const particles = [];
 
+// --- Audio ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// Unlock audio on first interaction
+document.addEventListener("keydown", () => { if (audioCtx.state === "suspended") audioCtx.resume(); }, { once: true });
+
+function playSound(type) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    switch (type) {
+        case "shoot":
+            osc.type = "square";
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+            osc.start(now);
+            osc.stop(now + 0.1);
+            break;
+        case "explode":
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.4);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            osc.start(now);
+            osc.stop(now + 0.4);
+            // Add noise burst
+            const noise = audioCtx.createBufferSource();
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.2, audioCtx.sampleRate);
+            const data = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+            noise.buffer = noiseBuffer;
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.15, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+            noise.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            noise.start(now);
+            break;
+        case "hit":
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.5);
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+            osc.start(now);
+            osc.stop(now + 0.5);
+            break;
+        case "powerup":
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+            osc.frequency.exponentialRampToValueAtTime(1200, now + 0.3);
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc.start(now);
+            osc.stop(now + 0.35);
+            break;
+        case "thrust":
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(50 + Math.random() * 20, now);
+            gain.gain.setValueAtTime(0.03, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+            osc.start(now);
+            osc.stop(now + 0.08);
+            break;
+    }
+}
+
+// --- Floating text ---
+const floatingTexts = [];
+const SLANG_GREAT = [
+    "RIPPER!", "BONZER!", "BEAUTY!", "STREWTH!", "TOO EASY!",
+    "FAIR DINKUM!", "YOU BEAUTY!", "BLOODY OATH!", "SICK AS!",
+    "STOKED!", "HEAPS GOOD!", "MINT!", "GROUSE!", "PEARLER!",
+    "CORKER!", "DEADSET LEGEND!", "NOICE!", "BEWDY!",
+];
+const SLANG_BAD = [
+    "CRIKEY!", "BUGGER!", "STREWTH!", "AW NAAAAH!", "BLOODY HELL!",
+    "STUFFED IT!", "CAME A GUTSER!", "CACTUS!", "GONE TO THE DOGS!",
+    "COOKED IT!", "UP THE CREEK!", "STONE THE CROWS!", "RACK OFF!",
+    "STUFFED!", "MATE NO!", "DRONGO MOVE!",
+];
+
+function spawnFloatingText(x, y, text, color) {
+    floatingTexts.push({
+        x, y,
+        text,
+        color,
+        life: 60,
+        vy: -2,
+        scale: 1.5,
+    });
+}
+
+function randomSlang(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
 // --- Wave system ---
 let wave = 0;
 let ufosToSpawn = 0;
@@ -239,6 +342,7 @@ function startUpgradeSelection() {
 }
 
 function fireBullets() {
+    playSound("shoot");
     const baseSpeed = 4.5;
     const cooldown = Math.max(3, 10 - upgrades.rapidFire * 2);
     shootCooldown = cooldown;
@@ -297,9 +401,12 @@ function takeDamage() {
         upgrades.shield = false;
         spawnParticles(ship.x, ship.y, 15, "#6bf");
         invincibleTimer = 45;
+        playSound("hit");
         return;
     }
     spawnParticles(ship.x, ship.y, 20, "#f80");
+    playSound("hit");
+    spawnFloatingText(ship.x, ship.y - 30, randomSlang(SLANG_BAD), "#f44");
     lives--;
     if (lives <= 0) { gameOver = true; return; }
     resetShip();
@@ -364,6 +471,7 @@ function update() {
             }
             if (lastKeyPress === " " || lastKeyPress === "Enter") {
                 upgradeChoices[selectedUpgrade].apply();
+                playSound("powerup");
                 spawnParticles(canvas.width / 2, canvas.height / 2, 30, upgradeChoices[selectedUpgrade].color);
                 lastKeyPress = null;
                 startWave();
@@ -383,6 +491,7 @@ function update() {
     if (ship.thrusting) {
         ship.vx += Math.cos(ship.angle) * ship.thrust;
         ship.vy += Math.sin(ship.angle) * ship.thrust;
+        if (Math.random() < 0.3) playSound("thrust");
     }
 
     // Ship movement
@@ -498,6 +607,8 @@ function update() {
             if (b.fromPlayer && dist(b, u) < u.radius + 3) {
                 score += u.radius === 12 ? 200 : 100;
                 spawnParticles(u.x, u.y, 12, "#0f0");
+                playSound("explode");
+                spawnFloatingText(u.x, u.y - 20, randomSlang(SLANG_GREAT), "#0f0");
                 if (!b.piercing) {
                     bullets.splice(j, 1);
                 }
@@ -551,6 +662,15 @@ function update() {
         p.y += p.vy;
         p.life--;
         if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Update floating texts
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const t = floatingTexts[i];
+        t.y += t.vy;
+        t.life--;
+        t.scale *= 0.97;
+        if (t.life <= 0) floatingTexts.splice(i, 1);
     }
 }
 
@@ -909,6 +1029,18 @@ function draw() {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
         ctx.fill();
+    }
+
+    // Floating texts
+    for (const t of floatingTexts) {
+        const alpha = t.life / 60;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = t.color;
+        ctx.font = `bold ${Math.round(16 * t.scale)}px monospace`;
+        ctx.textAlign = "center";
+        ctx.fillText(t.text, t.x, t.y);
+        ctx.restore();
     }
 
     // HUD
