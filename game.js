@@ -314,7 +314,7 @@ function resetShip() {
 
 function startWave() {
     wave++;
-    ufosToSpawn = 3 + wave * 2;
+    ufosToSpawn = 2 + wave;
     ufosAlive = 0;
     ufoSpawnTimer = 0;
     waveState = "waveIntro";
@@ -575,8 +575,8 @@ function update() {
         const toPlayerX = ship.x - u.x;
         const toPlayerY = ship.y - u.y;
         const toPlayerDist = Math.hypot(toPlayerX, toPlayerY) || 1;
-        u.vx += (toPlayerX / toPlayerDist) * 0.012;
-        u.vy += (toPlayerY / toPlayerDist) * 0.012;
+        u.vx += (toPlayerX / toPlayerDist) * 0.008;
+        u.vy += (toPlayerY / toPlayerDist) * 0.008;
 
         // Keep on screen — steer back if near edges
         const margin = 60;
