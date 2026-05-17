@@ -118,6 +118,34 @@ const SLANG_BAD = [
     "STUFFED!", "MATE NO!", "DRONGO MOVE!",
 ];
 
+// --- Speech ---
+const synth = window.speechSynthesis;
+let robotVoice = null;
+
+function pickVoice() {
+    const voices = synth.getVoices();
+    // Prefer a male English voice; fall back to any English, then default
+    robotVoice =
+        voices.find(v => /\b(Daniel|Alex|Fred|Google UK English Male|Microsoft David|Microsoft Mark)\b/i.test(v.name)) ||
+        voices.find(v => /en[-_]/i.test(v.lang) && /male/i.test(v.name)) ||
+        voices.find(v => /en[-_]/i.test(v.lang)) ||
+        voices[0] || null;
+}
+pickVoice();
+if (synth.onvoiceschanged !== undefined) {
+    synth.onvoiceschanged = pickVoice;
+}
+
+function speak(text) {
+    if (!synth || synth.speaking) return;
+    const utter = new SpeechSynthesisUtterance(text.replace("!", ""));
+    utter.rate = 1.4;
+    utter.pitch = 0.4;
+    utter.volume = 0.8;
+    if (robotVoice) utter.voice = robotVoice;
+    synth.speak(utter);
+}
+
 function spawnFloatingText(x, y, text, color) {
     floatingTexts.push({
         x, y,
@@ -127,6 +155,7 @@ function spawnFloatingText(x, y, text, color) {
         vy: -2,
         scale: 1.5,
     });
+    speak(text);
 }
 
 function randomSlang(arr) {
