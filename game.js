@@ -127,7 +127,7 @@ const ship = {
     vx: 0,
     vy: 0,
     thrust: 0.12,
-    friction: 0.99,
+    friction: 0.995,
     rotSpeed: 0.05,
     thrusting: false,
 };
@@ -162,7 +162,7 @@ function spawnUfo() {
     const vy = Math.sin(angle) * speed;
     const size = Math.random() < 0.2 + wave * 0.03 ? 12 : 20;
 
-    ufos.push({ x, y, vx, vy, radius: size, shootTimer: 60 + Math.floor(Math.random() * 60), bobTimer: Math.random() * Math.PI * 2 });
+    ufos.push({ x, y, vx, vy, radius: size, shootTimer: 120 + Math.floor(Math.random() * 120), bobTimer: Math.random() * Math.PI * 2 });
     ufosAlive++;
 }
 
@@ -448,7 +448,7 @@ function update() {
                 guided: false,
                 piercing: false,
             });
-            u.shootTimer = Math.max(25, 50 - wave * 2) + Math.floor(Math.random() * 40);
+            u.shootTimer = Math.max(50, 100 - wave * 2) + Math.floor(Math.random() * 80);
         }
 
         // Remove if off screen for too long
