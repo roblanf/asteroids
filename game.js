@@ -571,6 +571,13 @@ function update() {
         u.y += u.vy;
         u.bobTimer += 0.06;
 
+        // Slowly drift toward the player
+        const toPlayerX = ship.x - u.x;
+        const toPlayerY = ship.y - u.y;
+        const toPlayerDist = Math.hypot(toPlayerX, toPlayerY) || 1;
+        u.vx += (toPlayerX / toPlayerDist) * 0.012;
+        u.vy += (toPlayerY / toPlayerDist) * 0.012;
+
         // Keep on screen — steer back if near edges
         const margin = 60;
         if (u.x < margin) u.vx += 0.05;
