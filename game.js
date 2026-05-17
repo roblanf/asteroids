@@ -161,9 +161,29 @@ function spawnUfo() {
     const vx = Math.cos(angle) * speed;
     const vy = Math.sin(angle) * speed;
     const size = Math.random() < 0.2 + wave * 0.03 ? 12 : 20;
+    const turnRate = (Math.random() < 0.5 ? 1 : -1) * (0.01 + Math.random() * 0.015);
 
-    ufos.push({ x, y, vx, vy, radius: size, shootTimer: 120 + Math.floor(Math.random() * 120), bobTimer: Math.random() * Math.PI * 2 });
+    ufos.push({ x, y, vx, vy, radius: size, shootTimer: 120 + Math.floor(Math.random() * 120), bobTimer: Math.random() * Math.PI * 2, turnRate });
     ufosAlive++;
+}
+
+function spawnSmallUfos(x, y, count) {
+    for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+        const speed = 1.5 + Math.random() * 1.5 + wave * 0.1;
+        const turnRate = (Math.random() < 0.5 ? 1 : -1) * (0.015 + Math.random() * 0.02);
+        ufos.push({
+            x: x + Math.cos(angle) * 15,
+            y: y + Math.sin(angle) * 15,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            radius: 12,
+            shootTimer: 80 + Math.floor(Math.random() * 80),
+            bobTimer: Math.random() * Math.PI * 2,
+            turnRate,
+        });
+        ufosAlive++;
+    }
 }
 
 function spawnParticles(x, y, count, color) {
@@ -429,9 +449,29 @@ function update() {
     // Update UFOs
     for (let i = ufos.length - 1; i >= 0; i--) {
         const u = ufos[i];
+
+        // Rotate velocity to fly in circles
+        const cos = Math.cos(u.turnRate);
+        const sin = Math.sin(u.turnRate);
+        const newVx = u.vx * cos - u.vy * sin;
+        const newVy = u.vx * sin + u.vy * cos;
+        u.vx = newVx;
+        u.vy = newVy;
+
         u.x += u.vx;
         u.y += u.vy;
         u.bobTimer += 0.06;
+
+        // Keep on screen — steer back if near edges
+        const margin = 60;
+        if (u.x < margin) u.vx += 0.05;
+        if (u.x > canvas.width - margin) u.vx -= 0.05;
+        if (u.y < margin) u.vy += 0.05;
+        if (u.y > canvas.height - margin) u.vy -= 0.05;
+
+        // Clamp to screen bounds (hard stop)
+        u.x = Math.max(-20, Math.min(canvas.width + 20, u.x));
+        u.y = Math.max(-20, Math.min(canvas.height + 20, u.y));
 
         // UFO shooting
         u.shootTimer--;
@@ -451,14 +491,8 @@ function update() {
             u.shootTimer = Math.max(50, 100 - wave * 2) + Math.floor(Math.random() * 80);
         }
 
-        // Remove if off screen for too long
-        if (u.x < -60 || u.x > canvas.width + 60 || u.y < -60 || u.y > canvas.height + 60) {
-            ufos.splice(i, 1);
-            ufosAlive--;
-            continue;
-        }
-
         // Bullet-UFO collision
+        let destroyed = false;
         for (let j = bullets.length - 1; j >= 0; j--) {
             const b = bullets[j];
             if (b.fromPlayer && dist(b, u) < u.radius + 3) {
@@ -467,11 +501,17 @@ function update() {
                 if (!b.piercing) {
                     bullets.splice(j, 1);
                 }
+                // Big UFO splits into small ones
+                if (u.radius === 20) {
+                    spawnSmallUfos(u.x, u.y, 3);
+                }
                 ufos.splice(i, 1);
                 ufosAlive--;
+                destroyed = true;
                 break;
             }
         }
+        if (destroyed) continue;
     }
 
     // Ship-UFO collision
@@ -479,6 +519,9 @@ function update() {
         for (let i = ufos.length - 1; i >= 0; i--) {
             if (dist(ship, ufos[i]) < ship.radius + ufos[i].radius) {
                 spawnParticles(ufos[i].x, ufos[i].y, 12, "#0f0");
+                if (ufos[i].radius === 20) {
+                    spawnSmallUfos(ufos[i].x, ufos[i].y, 3);
+                }
                 ufos.splice(i, 1);
                 ufosAlive--;
                 takeDamage();
