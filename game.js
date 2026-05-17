@@ -124,20 +124,25 @@ let robotVoice = null;
 
 function pickVoice() {
     const voices = synth.getVoices();
-    // Prefer a male English voice; fall back to any English, then default
+    if (voices.length === 0) return;
+    // Strongly prefer known male voices
+    const maleNames = /\b(Daniel|Alex|Fred|Tom|Arthur|Google UK English Male|Microsoft David|Microsoft Mark|Microsoft George)\b/i;
     robotVoice =
-        voices.find(v => /\b(Daniel|Alex|Fred|Google UK English Male|Microsoft David|Microsoft Mark)\b/i.test(v.name)) ||
+        voices.find(v => maleNames.test(v.name) && /en[-_]/i.test(v.lang)) ||
+        voices.find(v => maleNames.test(v.name)) ||
         voices.find(v => /en[-_]/i.test(v.lang) && /male/i.test(v.name)) ||
+        voices.find(v => /en[-_](au|gb|us)/i.test(v.lang)) ||
         voices.find(v => /en[-_]/i.test(v.lang)) ||
-        voices[0] || null;
+        voices[0];
 }
+// Voices load async — keep trying until we get one
 pickVoice();
-if (synth.onvoiceschanged !== undefined) {
-    synth.onvoiceschanged = pickVoice;
-}
+synth.onvoiceschanged = pickVoice;
 
 function speak(text) {
     if (!synth || synth.speaking) return;
+    // Re-pick voice if we don't have one yet
+    if (!robotVoice) pickVoice();
     const utter = new SpeechSynthesisUtterance(text.replace("!", ""));
     utter.rate = 1.4;
     utter.pitch = 0.4;
